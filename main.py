@@ -59,7 +59,8 @@ def read_root():
 
 @app.get("/.well-known/agent.json")
 def agent_card(request: Request):
-    current_base_url = str(request.base_url).rstrip("/")
+    external_base = request.headers.get("x-external-base-url", "")
+    current_base_url = str(request.base_url).rstrip("/") + external_base
 
     response_agent_card = RAW_AGENT_CARD_DATA.copy()
     # new_name = f"{response_agent_card['name']}{random.randint(1, 1000)}"
