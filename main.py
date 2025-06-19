@@ -12,6 +12,7 @@ load_dotenv()
 
 WEATHER_API_KEY = os.getenv('WEATHER_API_KEY')
 WEATHER_API_URL = os.getenv('WEATHER_API_URL')
+PORT = int(os.getenv("PORT", 4000))
 
 app = FastAPI()
 
@@ -188,4 +189,4 @@ async def handle_request(request: Request, background_tasks: BackgroundTasks):
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 10000))
-    uvicorn.run("main:app", host="0.0.0.0", port=4000, reload=True)
+    uvicorn.run("main:app", host="127.0.0.1", port=PORT, reload=True)
