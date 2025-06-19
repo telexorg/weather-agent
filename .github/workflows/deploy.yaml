@@ -18,7 +18,7 @@ jobs:
           username: ${{ secrets.TELEX_SERVER_SSH_USER }}
           key: ${{ secrets.TELEX_SERVER_SSH_KEY }}
           script: |
-            cd /var/www/agents/weather_agent
+            cd /var/www/agents/weather-agent
             git pull origin main
             uv pip install -r requirements.txt
             stl restart weather_agent
