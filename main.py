@@ -12,6 +12,7 @@ load_dotenv()
 
 WEATHER_API_KEY = os.getenv('WEATHER_API_KEY')
 WEATHER_API_URL = os.getenv('WEATHER_API_URL')
+TELEX_API_KEY = os.getenv('TELEX_API_KEY')
 
 app = FastAPI()
 
@@ -70,7 +71,7 @@ def agent_card(request: Request):
     return response_agent_card
 
 
-async def handle_task(message:str, request_id, task_id: str, webhook_url: str, api_key: str):
+async def handle_task(message:str, request_id, task_id: str, webhook_url: str):
   response = None
 
   async with httpx.AsyncClient() as client:
@@ -114,7 +115,7 @@ async def handle_task(message:str, request_id, task_id: str, webhook_url: str, a
 
 
   async with httpx.AsyncClient() as client:
-    headers = {"X-TELEX-API-KEY": api_key}
+    headers = {"X-TELEX-API-KEY": TELEX_API_KEY}
     is_sent = await client.post(webhook_url, headers=headers,  json=webhook_response.model_dump(exclude_none=True))
     print(is_sent.status_code)
     pprint(is_sent.json())
@@ -130,7 +131,7 @@ async def handle_request(request: Request, background_tasks: BackgroundTasks):
     body = await request.json()
     request_id = body.get("id")
     webhook_url = body["params"]["configuration"]["pushNotificationConfig"]["url"]
-    api_key = body["params"]["configuration"]["pushNotificationConfig"]["authentication"]["credentials"]
+    # api_key = body["params"]["configuration"]["pushNotificationConfig"]["authentication"]["credentials"]
 
 
     message = body["params"]["message"]["parts"][0].get("text", None)
@@ -151,7 +152,7 @@ async def handle_request(request: Request, background_tasks: BackgroundTasks):
 
     # await handle_task(message, request_id, new_task.id, webhook_url, api_key)
     
-    background_tasks.add_task(handle_task, message, request_id, new_task.id, webhook_url, api_key)
+    background_tasks.add_task(handle_task, message, request_id, new_task.id, webhook_url)
 
     response = schemas.JSONRPCResponse(
        id=request_id,
