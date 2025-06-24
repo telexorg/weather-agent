@@ -13,6 +13,7 @@ load_dotenv()
 WEATHER_API_KEY = os.getenv('WEATHER_API_KEY')
 WEATHER_API_URL = os.getenv('WEATHER_API_URL')
 TELEX_API_KEY = os.getenv('TELEX_API_KEY')
+PORT = int(os.getenv("PORT", 4000))
 
 app = FastAPI()
 
@@ -59,7 +60,8 @@ def read_root():
 
 @app.get("/.well-known/agent.json")
 def agent_card(request: Request):
-    current_base_url = str(request.base_url).rstrip("/")
+    external_base = request.headers.get("x-external-base-url", "")
+    current_base_url = str(request.base_url).rstrip("/") + external_base
 
     response_agent_card = RAW_AGENT_CARD_DATA.copy()
     # new_name = f"{response_agent_card['name']}{random.randint(1, 1000)}"
@@ -189,4 +191,4 @@ async def handle_request(request: Request, background_tasks: BackgroundTasks):
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 10000))
-    uvicorn.run("main:app", host="0.0.0.0", port=4000, reload=True)
+    uvicorn.run("main:app", host="127.0.0.1", port=PORT, reload=True)
