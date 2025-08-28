@@ -14,9 +14,9 @@ jobs:
       - name: Restart App
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.TELEX_SERVER_SSH_HOST }}
-          username: ${{ secrets.TELEX_SERVER_SSH_USER }}
-          key: ${{ secrets.TELEX_SERVER_SSH_KEY }}
+          host: ${{ secrets.AGENTS_SERVER_SSH_HOST }}
+          username: ${{ secrets.AGENTS_SERVER_SSH_USER }}
+          key: ${{ secrets.AGENTS_SERVER_SSH_KEY }}
           script: |
             cd /var/www/agents/weather-agent
             git pull origin main
