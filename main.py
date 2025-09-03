@@ -115,17 +115,17 @@ async def handle_task(message:str, request_id, task_id: str, webhook_url: str, a
       result=task
   )
 
-  pprint(webhook_response.model_dump())
+  # pprint(webhook_response.model_dump())
 
 
-  async with httpx.AsyncClient() as client:
-    headers = {"X-TELEX-API-KEY": api_key}
-    is_sent = await client.post(webhook_url, headers=headers,  json=webhook_response.model_dump(exclude_none=True))
-    print(is_sent.status_code)
-    pprint(is_sent.json())
+  # async with httpx.AsyncClient() as client:
+  #   headers = {"X-TELEX-API-KEY": api_key}
+  #   is_sent = await client.post(webhook_url, headers=headers,  json=webhook_response.model_dump(exclude_none=True))
+  #   print(is_sent.status_code)
+  #   pprint(is_sent.json())
 
-  print("background done")
-  return 
+  # print("background done")
+  return webhook_response
 
 
 
@@ -153,13 +153,13 @@ async def handle_request(request: Request, background_tasks: BackgroundTasks):
       )
     )
 
-    # await handle_task(message, request_id, new_task.id, webhook_url, api_key)
+    task = await handle_task(message, request_id, new_task.id, webhook_url, api_key)
     
-    background_tasks.add_task(handle_task, message, request_id, new_task.id, webhook_url, api_key)
+    # background_tasks.add_task(handle_task, message, request_id, new_task.id, webhook_url, api_key)
 
     response = schemas.JSONRPCResponse(
        id=request_id,
-       result=new_task
+       result=task
     )
 
   except json.JSONDecodeError as e:
