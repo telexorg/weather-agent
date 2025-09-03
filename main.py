@@ -157,10 +157,10 @@ async def handle_request(request: Request, background_tasks: BackgroundTasks):
     
     # background_tasks.add_task(handle_task, message, request_id, new_task.id, webhook_url, api_key)
 
-    response = schemas.JSONRPCResponse(
-       id=request_id,
-       result=task
-    )
+    # response = schemas.JSONRPCResponse(
+    #    id=request_id,
+    #    result=task
+    # )
 
   except json.JSONDecodeError as e:
     error = schemas.JSONParseError(
@@ -185,7 +185,7 @@ async def handle_request(request: Request, background_tasks: BackgroundTasks):
        error=error
     )
 
-  response = response.model_dump(exclude_none=True)
+  response = task.model_dump(exclude_none=True)
   pprint(response)
   return response
 
