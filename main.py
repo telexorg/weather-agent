@@ -1,11 +1,17 @@
-import os, random, httpx
-from pprint import pprint
-import uvicorn, json
-import schemas
+import os
+import json
+import random
 from uuid import uuid4
+from pprint import pprint
+
+import uvicorn
+import httpx
 from fastapi import FastAPI, Request, status, HTTPException, BackgroundTasks
 from fastapi.responses import HTMLResponse
 from dotenv import load_dotenv
+
+import schemas
+from schemas import AgentCard
 
 load_dotenv()
 
@@ -54,18 +60,13 @@ def agent_card(request: Request):
     external_base = request.headers.get("x-external-base-url", "")
     current_base_url = str(request.base_url).rstrip("/") + external_base
 
-    from schemas import AgentCard
-
     agent_card = AgentCard(**RAW_AGENT_CARD_DATA)
 
-    response_agent_card = RAW_AGENT_CARD_DATA.copy()
-    # new_name = f"{response_agent_card['name']}{random.randint(1, 1000)}"
-    # print(new_name)
-    response_agent_card["url"] = current_base_url
-    response_agent_card["provider"]["url"] = current_base_url
-    response_agent_card["provider"]["documentationUrl"] = f"{current_base_url}/docs"
+    agent_card.url = current_base_url
+    agent_card.documentationUrl = f"{current_base_url}/docs"
+    agent_card.provider.url = current_base_url
 
-    return response_agent_card
+    return agent_card
 
 
 async def handle_task(
