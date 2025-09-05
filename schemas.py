@@ -8,7 +8,7 @@ from pydantic import (
 )
 from datetime import datetime
 from enum import Enum
-from typing import Annotated, Any, Literal, Self
+from typing import Annotated, Any, Literal, Self, Union, Optional
 from uuid import uuid4
 
 class TaskState(str, Enum):
@@ -370,3 +370,20 @@ class A2AClientJSONError(A2AClientError):
 
 class MissingAPIKeyError(Exception):
     """Exception for missing API key."""
+
+
+
+
+class Parameter(BaseModel):
+    value: Union[str, list[str]]
+    value_type: str
+    description: str
+    example_value: Optional[Union[str, list[str]]] = None
+    from_conversation: bool
+    value_options: Optional[list[str]] = None
+
+
+class WeatherAPIConfig(BaseModel):
+    api_key: Parameter = None
+    timezone: Parameter = None
+    location: Parameter

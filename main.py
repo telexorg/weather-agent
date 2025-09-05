@@ -73,15 +73,18 @@ def agent_card(request: Request):
     return response_agent_card
 
 
-async def handle_task(message:str, request_id, task_id: str, webhook_url: str, api_key: str):
+async def handle_task(message:schemas.WeatherAPIConfig, request_id, task_id: str, webhook_url: str, api_key: str):
   response = None
+
+  location = message.location.value
+  print(location)
 
   async with httpx.AsyncClient() as client:
     response = await client.get(
       url=WEATHER_API_URL, 
       params={
         "key":WEATHER_API_KEY,
-        "q": message
+        "q": location
       }
     )
 
@@ -91,7 +94,7 @@ async def handle_task(message:str, request_id, task_id: str, webhook_url: str, a
   feels_like = res.get("feelslike_c", None)
   condition : str = res.get("condition", None).get("text", None)
 
-  text = f"The weather in {message.title()} is {temperature} degrees but feels like {feels_like} degrees. {condition.capitalize()}"
+  text = f"The weather in {location.title()} is {temperature} degrees but feels like {feels_like} degrees. {condition.capitalize()}"
 
   print(text)
 
@@ -137,7 +140,7 @@ async def handle_request(request: Request, background_tasks: BackgroundTasks):
     webhook_url = body["params"]["configuration"]["pushNotificationConfig"]["url"]
     api_key = body["params"]["configuration"]["pushNotificationConfig"]["authentication"].get("credentials", TELEX_API_KEY)
 
-    message = body["params"]["message"]["parts"][0].get("text", None)
+    message = schemas.WeatherAPIConfig.model_validate(body["params"]["message"]["parts"][0]["data"])
 
     if not message:
       raise HTTPException(
@@ -145,15 +148,17 @@ async def handle_request(request: Request, background_tasks: BackgroundTasks):
         detail="Message cannot be empty."
       )
     
-    new_task = schemas.Task(
-      id = uuid4().hex,
-      status =  schemas.TaskStatus(
-        state=schemas.TaskState.SUBMITTED, 
-        message=schemas.Message(role="agent", parts=[schemas.TextPart(text="In progress")])
-      )
-    )
+    task_id = uuid4().hex
+    
+    # new_task = schemas.Task(
+    #   id = uuid4().hex,
+      # status =  schemas.TaskStatus(
+      #   state=schemas.TaskState.SUBMITTED, 
+      #   message=schemas.Message(role="agent", parts=[schemas.TextPart(text="In progress")])
+      # )
+    # )
 
-    task = await handle_task(message, request_id, new_task.id, webhook_url, api_key)
+    task = await handle_task(message, request_id, task_id, webhook_url, api_key)
     
     # background_tasks.add_task(handle_task, message, request_id, new_task.id, webhook_url, api_key)
 
@@ -161,6 +166,9 @@ async def handle_request(request: Request, background_tasks: BackgroundTasks):
     #    id=request_id,
     #    result=task
     # )
+    response = task.model_dump(exclude_none=True)
+    pprint(response)
+    return response
 
   except json.JSONDecodeError as e:
     error = schemas.JSONParseError(
@@ -185,9 +193,6 @@ async def handle_request(request: Request, background_tasks: BackgroundTasks):
        error=error
     )
 
-  response = task.model_dump(exclude_none=True)
-  pprint(response)
-  return response
 
 
 if __name__ == "__main__":
