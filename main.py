@@ -102,7 +102,7 @@ async def handle_task(message:schemas.WeatherAPIConfig, request_id, task_id: str
         id=task_id,
         status=schemas.TaskStatus(
             state=schemas.TaskState.COMPLETED,
-            message=schemas.Message(role="agent", parts=[schemas.TextPart(text=text)]),
+            # message=schemas.Message(role="agent", parts=[schemas.TextPart(text=text)]),
         ),
         artifacts=[artifacts],
     )
