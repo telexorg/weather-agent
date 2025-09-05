@@ -68,19 +68,22 @@ def agent_card(request: Request):
 
     return agent_card
 
-
-async def handle_task(
-    message: str, request_id, task_id: str, webhook_url: str, api_key: str
-):
+async def handle_task(message:schemas.WeatherAPIConfig, request_id, task_id: str, webhook_url: str, api_key: str):
     response = None
 
+    location = message.location.value
+    print(location)
+
     async with httpx.AsyncClient() as client:
-        response = await client.get(
-            url=WEATHER_API_URL, params={"key": WEATHER_API_KEY, "q": message}
-        )
+      response = await client.get(
+        url=WEATHER_API_URL, 
+        params={
+          "key":WEATHER_API_KEY,
+          "q": location
+        }
+      )
 
     res = response.json().get("current", {})
-
     temperature = res.get("temp_c", "not available")
     feels_like = res.get("feelslike_c", None)
     condition: str = res.get("condition", None).get("text", None)
@@ -120,56 +123,64 @@ async def handle_task(
 
 @app.post("/")
 async def handle_request(request: Request, background_tasks: BackgroundTasks):
-    try:
-        body = await request.json()
-        request_id = body.get("id")
-        webhook_url = body["params"]["configuration"]["pushNotificationConfig"]["url"]
-        api_key = body["params"]["configuration"]["pushNotificationConfig"][
-            "authentication"
-        ].get("credentials", TELEX_API_KEY)
+  try:
+    body = await request.json()
+    request_id = body.get("id")
+    webhook_url = body["params"]["configuration"]["pushNotificationConfig"]["url"]
+    api_key = body["params"]["configuration"]["pushNotificationConfig"]["authentication"].get("credentials", TELEX_API_KEY)
 
-        message = body["params"]["message"]["parts"][0].get("text", None)
+    message = schemas.WeatherAPIConfig.model_validate(body["params"]["message"]["parts"][0]["data"])
 
-        if not message:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Message cannot be empty.",
-            )
+    if not message:
+      raise HTTPException(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        detail="Message cannot be empty."
+      )
+    
+    task_id = uuid4().hex
+    
+    # new_task = schemas.Task(
+    #   id = uuid4().hex,
+      # status =  schemas.TaskStatus(
+      #   state=schemas.TaskState.SUBMITTED, 
+      #   message=schemas.Message(role="agent", parts=[schemas.TextPart(text="In progress")])
+      # )
+    # )
 
-        new_task = schemas.Task(
-            id=uuid4().hex,
-            status=schemas.TaskStatus(
-                state=schemas.TaskState.SUBMITTED,
-                message=schemas.Message(
-                    role="agent", parts=[schemas.TextPart(text="In progress")]
-                ),
-            ),
-        )
+    task = await handle_task(message, request_id, task_id, webhook_url, api_key)
+    
+    # background_tasks.add_task(handle_task, message, request_id, new_task.id, webhook_url, api_key)
 
-        task = await handle_task(message, request_id, new_task.id, webhook_url, api_key)
-
-        # background_tasks.add_task(handle_task, message, request_id, new_task.id, webhook_url, api_key)
-
-        # response = schemas.JSONRPCResponse(
-        #    id=request_id,
-        #    result=task
-        # )
-
-    except json.JSONDecodeError as e:
-        error = schemas.JSONParseError(data=str(e))
-
-        request = await request.json()
-        response = schemas.JSONRPCResponse(id=request.get("id"), error=error)
-
-    except Exception as e:
-        error = schemas.JSONRPCError(code=-32600, message=str(e))
-
-        request = await request.json()
-        response = schemas.JSONRPCResponse(id=request.get("id"), error=error)
-
+    # response = schemas.JSONRPCResponse(
+    #    id=request_id,
+    #    result=task
+    # )
     response = task.model_dump(exclude_none=True)
     pprint(response)
     return response
+
+  except json.JSONDecodeError as e:
+    error = schemas.JSONParseError(
+      data = str(e)
+    )
+
+    request = await request.json()
+    response = schemas.JSONRPCResponse(
+       id=request.get("id"),
+       error=error
+    )
+
+  except Exception as e:
+    error = schemas.JSONRPCError(
+      code = -32600,
+      message = str(e)
+    )
+
+    request = await request.json()
+    response = schemas.JSONRPCResponse(
+       id=request.get("id"),
+       error=error
+    )
 
 
 if __name__ == "__main__":
