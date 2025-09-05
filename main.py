@@ -1,55 +1,52 @@
-import os, random, httpx
-from pprint import pprint
-import uvicorn, json
-import schemas
+import os
+import json
+import random
 from uuid import uuid4
+from pprint import pprint
+
+import uvicorn
+import httpx
 from fastapi import FastAPI, Request, status, HTTPException, BackgroundTasks
 from fastapi.responses import HTMLResponse
-from a2a.utils import new_agent_text_message
 from dotenv import load_dotenv
+
+import schemas
+from schemas import AgentCard
 
 load_dotenv()
 
-WEATHER_API_KEY = os.getenv('WEATHER_API_KEY')
-WEATHER_API_URL = os.getenv('WEATHER_API_URL')
-TELEX_API_KEY = os.getenv('TELEX_API_KEY')
+WEATHER_API_KEY = os.getenv("WEATHER_API_KEY")
+WEATHER_API_URL = os.getenv("WEATHER_API_URL")
+TELEX_API_KEY = os.getenv("TELEX_API_KEY")
 PORT = int(os.getenv("PORT", 4000))
 
 app = FastAPI()
 
 RAW_AGENT_CARD_DATA = {
-  "name": "CurrentWeatherAgent",
-  "description": "An agent that accepts a request, creates a task and sends the task status back to the client, keeps processing the task and then sends the task response when the task is completed",
-  "url": "",
-  "provider": {
-      "organization": "Telex Org.",
-      "url": "https://telex.im"
-    },
-  "version": "1.0.0",
-  "documentationUrl": "",
-  "is_paid": False,
-  "price": {},
-  "capabilities": {
-    "streaming": False,
-    "pushNotifications": True
-  },
-  "defaultInputModes": ["text/plain"],
-  "defaultOutputModes": ["text/plain"],
-  "skills": [
-    {
-      "id": "weather",
-      "name": "Get current Weather",
-      "description": "Responds with the current weather.",
-      "inputModes": ["text"],
-      "outputModes": ["text"],
-      "examples": [
+    "name": "CurrentWeatherAgent",
+    "description": "An agent that accepts a request, creates a task and sends the task status back to the client, keeps processing the task and then sends the task response when the task is completed",
+    "url": "",
+    "provider": {"organization": "Telex Org.", "url": "https://telex.im"},
+    "version": "1.0.0",
+    "documentationUrl": "",
+    "is_paid": False,
+    "price": {},
+    "capabilities": {"streaming": False, "pushNotifications": True},
+    "defaultInputModes": ["text/plain"],
+    "defaultOutputModes": ["text/plain"],
+    "skills": [
         {
-          "input": { "parts": [{ "text": "Abuja", "contentType": "text/plain" }] },
-          "output": { "parts": [{ "text": "The weather in Abuja is 29.5 degrees but feels like 32.4 degrees. Partly cloudy", "contentType": "text/plain" }] }
+            "id": "weather",
+            "name": "Get current Weather",
+            "description": "Responds with the current weather.",
+            "inputModes": ["text/plain"],
+            "outputModes": ["text/plain"],
+            "examples": [
+                "Abuja",
+                "The weather in Abuja is 29.5 degrees but feels like 32.4 degrees. Partly cloudy",
+            ],
         }
-      ]
-    }
-  ]
+    ],
 }
 
 
@@ -63,73 +60,65 @@ def agent_card(request: Request):
     external_base = request.headers.get("x-external-base-url", "")
     current_base_url = str(request.base_url).rstrip("/") + external_base
 
-    response_agent_card = RAW_AGENT_CARD_DATA.copy()
-    # new_name = f"{response_agent_card['name']}{random.randint(1, 1000)}"
-    # print(new_name)
-    response_agent_card["url"] = current_base_url
-    response_agent_card["provider"]["url"] = current_base_url
-    response_agent_card["provider"]["documentationUrl"] = f"{current_base_url}/docs"
+    agent_card = AgentCard(**RAW_AGENT_CARD_DATA)
 
-    return response_agent_card
+    agent_card.url = current_base_url
+    agent_card.documentationUrl = f"{current_base_url}/docs"
+    agent_card.provider.url = current_base_url
 
+    return agent_card
 
 async def handle_task(message:schemas.WeatherAPIConfig, request_id, task_id: str, webhook_url: str, api_key: str):
-  response = None
+    response = None
 
-  location = message.location.value
-  print(location)
+    location = message.location.value
+    print(location)
 
-  async with httpx.AsyncClient() as client:
-    response = await client.get(
-      url=WEATHER_API_URL, 
-      params={
-        "key":WEATHER_API_KEY,
-        "q": location
-      }
+    async with httpx.AsyncClient() as client:
+      response = await client.get(
+        url=WEATHER_API_URL, 
+        params={
+          "key":WEATHER_API_KEY,
+          "q": location
+        }
+      )
+
+    res = response.json().get("current", {})
+    temperature = res.get("temp_c", "not available")
+    feels_like = res.get("feelslike_c", None)
+    condition: str = res.get("condition", None).get("text", None)
+
+    text = f"The weather in {message.title()} is {temperature} degrees but feels like {feels_like} degrees. {condition.capitalize()}"
+
+    print(text)
+
+    parts = schemas.TextPart(text=text)
+
+    message = schemas.Message(role="agent", parts=[parts])
+
+    artifacts = schemas.Artifact(parts=[parts])
+
+    task = schemas.Task(
+        id=task_id,
+        status=schemas.TaskStatus(
+            state=schemas.TaskState.COMPLETED,
+            message=schemas.Message(role="agent", parts=[schemas.TextPart(text=text)]),
+        ),
+        artifacts=[artifacts],
     )
 
-  res = response.json().get("current", {})
+    webhook_response = schemas.SendResponse(id=request_id, result=task)
 
-  temperature = res.get("temp_c", "not available")
-  feels_like = res.get("feelslike_c", None)
-  condition : str = res.get("condition", None).get("text", None)
+    # pprint(webhook_response.model_dump())
 
-  text = f"The weather in {location.title()} is {temperature} degrees but feels like {feels_like} degrees. {condition.capitalize()}"
+    # async with httpx.AsyncClient() as client:
+    #   headers = {"X-TELEX-API-KEY": api_key}
+    #   is_sent = await client.post(webhook_url, headers=headers,  json=webhook_response.model_dump(exclude_none=True))
+    #   print(is_sent.status_code)
+    #   pprint(is_sent.json())
 
-  print(text)
-
-  parts = schemas.TextPart(text=text)
-
-  message = schemas.Message(role="agent", parts=[parts])
-
-  artifacts = schemas.Artifact(parts=[parts])
-
-  task = schemas.Task(
-    id = task_id,
-    status =  schemas.TaskStatus(
-      state=schemas.TaskState.COMPLETED, 
-      message=schemas.Message(role="agent", parts=[schemas.TextPart(text=text)])
-    ),
-    artifacts = [artifacts]
-  )
-
-  webhook_response = schemas.SendResponse(
-      id=request_id,
-      result=task
-  )
-
-  # pprint(webhook_response.model_dump())
-
-
-  # async with httpx.AsyncClient() as client:
-  #   headers = {"X-TELEX-API-KEY": api_key}
-  #   is_sent = await client.post(webhook_url, headers=headers,  json=webhook_response.model_dump(exclude_none=True))
-  #   print(is_sent.status_code)
-  #   pprint(is_sent.json())
-
-  # print("background done")
-  return webhook_response
-
+    # print("background done")
+    return webhook_response
 
 
 @app.post("/")
@@ -192,7 +181,6 @@ async def handle_request(request: Request, background_tasks: BackgroundTasks):
        id=request.get("id"),
        error=error
     )
-
 
 
 if __name__ == "__main__":
