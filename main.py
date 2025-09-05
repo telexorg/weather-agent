@@ -88,7 +88,7 @@ async def handle_task(message:schemas.WeatherAPIConfig, request_id, task_id: str
     feels_like = res.get("feelslike_c", None)
     condition: str = res.get("condition", None).get("text", None)
 
-    text = f"The weather in {message.title()} is {temperature} degrees but feels like {feels_like} degrees. {condition.capitalize()}"
+    text = f"The weather in {location.title()} is {temperature} degrees but feels like {feels_like} degrees. {condition.capitalize()}"
 
     print(text)
 
